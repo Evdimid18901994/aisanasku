@@ -1,0 +1,17 @@
+# Python venv
+.venv/
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# PyCharm
+.idea/
+
+# Bytecode
+__pycache__/
+*.py[cod]
+
+# Models
+*.pkl
+*.joblib
