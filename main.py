@@ -16,6 +16,9 @@ from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve
 import time
+import zipfile
+import io
+import shutil
 
 st.set_page_config(page_title='Antifraud AI', page_icon=':mag:', layout='wide', initial_sidebar_state = 'auto')
 
@@ -119,6 +122,108 @@ if st.experimental_user.is_logged_in:
 
     if page == "🏋️‍♂️ Обучить":
         st.header("Обучение модели")
+        st.subheader("Генератор тестовых данных")
+        st.subheader("Генератор реалистичных тестовых данных")
+
+        # Настройки генерации
+        col1, col2 = st.columns(2)
+        with col1:
+            num_files = st.slider(
+                "Количество датасетов",
+                min_value=1,
+                max_value=20,
+                value=5
+            )
+        with col2:
+            records_per_file = st.slider(
+                "Записей в каждом файле",
+                min_value=1000,
+                max_value=100000,
+                value=10000,
+                step=1000
+            )
+
+
+        if st.button("🔄 Сгенерировать реалистичные данные"):
+            def generate_realistic_data(n=10000, seed=None, fraud_pct=0.05):
+                if seed is not None:
+                    np.random.seed(seed)
+
+                # Полная версия вашего генератора
+                data = {
+                    "Age": np.random.randint(18, 80, size=n),
+                    "Occupation": np.random.choice([
+                        "Teacher", "Engineer", "Clerk", "Unemployed", "Software Developer",
+                        "Manager", "Technician", "Consultant", "Analyst", "Sales"
+                    ], size=n),
+                    "MaritalStatus": np.random.choice(["Single", "Married", "Divorced"], size=n),
+                    "Dependents": np.random.randint(0, 5, size=n),
+                    "ResidentialStatus": np.random.choice(["Own", "Rent", "Live with Parents"], size=n),
+                    "AddressDuration": np.random.randint(0, 360, size=n),
+                    "CreditScore": np.random.normal(650, 100, size=n).clip(300, 850).astype(int),
+                    "IncomeLevel": np.random.exponential(scale=50000, size=n).clip(5000, 200000).astype(int),
+                    "LoanAmountRequested": np.random.gamma(shape=2, scale=50000, size=n).clip(1000, 500000).astype(int),
+                    "LoanTerm": np.random.randint(1,30 ,size=n),
+                    "PurposeoftheLoan": np.random.choice([
+                        "Education", "Business", "Car", "House", "Medical", "Vacation"
+                    ], size=n, p=[0.2, 0.3, 0.15, 0.25, 0.05, 0.05]),
+                    "Collateral": np.random.choice(["House", "Car", "None"], size=n, p=[0.4, 0.3, 0.3]),
+                    "InterestRate": np.round(np.random.normal(10, 3, size=n).clip(1.5, 25), 2),
+                    "PreviousLoans": np.random.poisson(2, size=n).clip(0, 10),
+                    "ExistingLiabilities": np.random.binomial(10, 0.3, size=n),
+                    "ApplicationBehavior": np.random.choice(["Careful", "Risky"], size=n, p=[0.7, 0.3]),
+                    "LocationofApplication": np.random.choice(["Online", "Branch", "Referral"], size=n,
+                                                              p=[0.6, 0.3, 0.1]),
+                    "ChangeinBehavior": np.random.choice(["Stable", "Sudden", "Gradual"], size=n, p=[0.8, 0.1, 0.1]),
+                    "TimeofTransaction": np.random.choice(["Morning", "Afternoon", "Evening", "Night"], size=n,
+                                                          p=[0.2, 0.3, 0.3, 0.2]),
+                    "AccountActivity": np.random.choice(["Normal", "Unusual"], size=n, p=[0.9, 0.1]),
+                    "PaymentBehavior": np.random.choice(["On-time", "Delayed", "Defaulted"], size=n,
+                                                        p=[0.85, 0.1, 0.05]),
+                    "Blacklists": np.random.choice(["Yes", "No"], size=n, p=[0.1, 0.9]),
+                    "EmploymentVerification": np.random.choice(["Verified", "Not Verified"], size=n, p=[0.8, 0.2]),
+                    "PastFinancialMalpractices": np.random.choice(["Yes", "No"], size=n, p=[0.05, 0.95]),
+                    "DeviceInformation": np.random.choice(["Mobile", "Laptop", "Tablet"], size=n, p=[0.6, 0.3, 0.1]),
+                    "SocialMediaFootprint": np.random.choice(["Yes", "No"], size=n, p=[0.7, 0.3]),
+                    "ConsistencyinData": np.random.choice(["Consistent", "Inconsistent"], size=n, p=[0.9, 0.1]),
+                    "Referral": np.random.choice(["Online", "Referral", "Branch"], size=n, p=[0.5, 0.3, 0.2]),
+                }
+                return pd.DataFrame(data)
+
+
+            # Генерация с прогресс-баром
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            os.makedirs("synthetic_data", exist_ok=True)
+
+            for i in range(num_files):
+                df = generate_realistic_data(
+                    records_per_file,
+                    seed=42 + i,
+                )
+                df.to_csv(f"synthetic_data/dataset_{i + 1}.csv", index=False)
+                progress_bar.progress((i + 1) / num_files)
+                status_text.text(f"Генерация {i + 1}/{num_files} файлов...")
+
+            # Упаковка в ZIP
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zipf:
+                for i in range(1, num_files + 1):
+                    with open(f"synthetic_data/dataset_{i}.csv", "rb") as f:
+                        zipf.writestr(f"fraud_dataset_{i}.csv", f.read())
+
+            # Кнопка скачивания
+            st.download_button(
+                label=f"📥 Скачать {num_files} файлов (ZIP)",
+                data=zip_buffer.getvalue(),
+                file_name="fraud_datasets.zip",
+                mime="application/zip"
+            )
+
+            # Очистка временных файлов
+            shutil.rmtree("synthetic_data")
+            st.success("✅ Данные готовы!")
         uploaded_file = st.file_uploader("Загрузите CSV с колонкой 'IsFraud'", type=["csv"])
         use_default = st.checkbox("Или используйте стандартный датасет")
 
