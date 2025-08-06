@@ -101,7 +101,7 @@ if st.sidebar.button("Войти"):
 
 page = st.sidebar.selectbox("Выберите страницу:", ["🏋️‍♂️ Обучить", "🔍 Использовать"])
 
-if st.experimental_user.is_logged_in:
+if st.user.is_logged_in:
     def align_features(df, feature_names):
         for col in feature_names:
             if col not in df.columns:
@@ -505,5 +505,5 @@ if st.experimental_user.is_logged_in:
         else:
             st.error("❌ Сначала обучите модель")
 
-if not st.experimental_user.is_logged_in:
+if not st.user.is_logged_in:
     st.warning('Для использования модели AI Sana необходимо зарегистрироваться')
